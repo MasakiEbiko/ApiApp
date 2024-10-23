@@ -11,8 +11,9 @@ import AlamofireImage
 import RealmSwift
 import SafariServices
 
-class ApiViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
+class ApiViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UISearchBarDelegate {
 
+    @IBOutlet weak var searchBar: UISearchBar!
     @IBOutlet weak var tableView: UITableView!
     @IBOutlet weak var statusLabel: UILabel!
     let realm = try! Realm()
@@ -50,6 +51,14 @@ class ApiViewController: UIViewController, UITableViewDelegate, UITableViewDataS
         updateShopArray()
     }
     
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        self.updateShopArray()
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String){
+        self.updateShopArray()
+    }
+
     func updateShopArray(appendLoad: Bool = false) {
         // 現在読み込み中なら読み込みを開始しない
         if isLoading {
@@ -68,11 +77,12 @@ class ApiViewController: UIViewController, UITableViewDelegate, UITableViewDataS
         }
         // 読み込み中状態開始
         isLoading = true
+                
         let parameters: [String: Any] = [
             "key": apiKey,
             "start": startIndex,
             "count": 20,
-            "keyword": "ランチ",
+            "keyword": self.searchBar.text!,
             "format": "json"
         ]
         AF.request("https://webservice.recruit.co.jp/hotpepper/gourmet/v1/", method: .get, parameters: parameters).responseDecodable(of: ApiResponse.self) { response in
@@ -85,7 +95,7 @@ class ApiViewController: UIViewController, UITableViewDelegate, UITableViewDataS
             // レスポンス受信処理
             switch response.result {
             case .success(let apiResponse):
-                print("受信データ: \(apiResponse)")
+                //print("受信データ: \(apiResponse)")
                 if appendLoad {
                     // 追加読み込みの場合は、現在のshopArrayに追加
                     self.shopArray += apiResponse.results.shop
@@ -102,7 +112,7 @@ class ApiViewController: UIViewController, UITableViewDelegate, UITableViewDataS
             case .failure(let error):
                 print(error)
                 self.shopArray = []
-                self.statusLabel.text = "データの取得に失敗しました"
+                self.statusLabel.text = self.searchBar.text!.count == 0 ? "検索ワードを入力してください" : "データの取得に失敗しました"
             }
             self.tableView.reloadData()
         }
@@ -151,13 +161,11 @@ class ApiViewController: UIViewController, UITableViewDelegate, UITableViewDataS
         let shop = shopArray[indexPath.row]
         
         if shop.isFavorite {
-            print("「\(shop.name)」をお気に入りから削除します")
             try! realm.write {
                 let favoriteShop = realm.object(ofType: FavoriteShop.self, forPrimaryKey: shop.id)!
                 realm.delete(favoriteShop)
             }
         } else {
-            print("「\(shop.name)」をお気に入りに追加します")
             try! realm.write {
                 let favoriteShop = FavoriteShop()
                 favoriteShop.id = shop.id
